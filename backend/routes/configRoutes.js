@@ -1,36 +1,42 @@
 const express = require("express");
-const auth = require("../middleware/auth");
-const roles = require("../middleware/roles");
+const { encrypt } = require("../utils/crypto");
 const ZoomConfig = require("../models/ZoomConfig");
-const { encrypt, decrypt } = require("../utils/crypto");
 
 const router = express.Router();
 
-// Get current company zoom config (admin)
-router.get("/zoom", auth, roles("admin"), async (req, res) => {
-  const cfg = await ZoomConfig.findOne({ companyId: req.user.companyId });
-  if (!cfg) return res.json(null);
-  res.json({
-    clientId: "****" + decrypt(cfg.clientIdEnc).slice(-4),
-    accountId: "****" + decrypt(cfg.accountIdEnc).slice(-4)
-    // Never return clientSecret in plain
-  });
+// Save/update Zoom credentials for a company
+router.post("/zoom", async (req, res) => {
+  try {
+    const { companyId, clientId, clientSecret, accountId } = req.body;
+    if (!companyId || !clientId || !clientSecret || !accountId) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const cfg = await ZoomConfig.findOneAndUpdate(
+      { companyId },
+      {
+        clientIdEnc: encrypt(clientId),
+        clientSecretEnc: encrypt(clientSecret),
+        accountIdEnc: encrypt(accountId)
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({ message: "✅ Zoom config saved", cfg });
+  } catch (err) {
+    console.error("Save ZoomConfig error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Save/Update zoom config (admin)
-router.post("/zoom", auth, roles("admin"), async (req, res) => {
-  const { clientId, clientSecret, accountId } = req.body;
-  const doc = await ZoomConfig.findOneAndUpdate(
-    { companyId: req.user.companyId },
-    {
-      companyId: req.user.companyId,
-      clientIdEnc: encrypt(clientId),
-      clientSecretEnc: encrypt(clientSecret),
-      accountIdEnc: encrypt(accountId)
-    },
-    { upsert: true, new: true }
-  );
-  res.json({ ok: true });
+// Fetch Zoom config (for admin/debugging)
+router.get("/zoom/:companyId", async (req, res) => {
+  try {
+    const cfg = await ZoomConfig.findOne({ companyId: req.params.companyId });
+    res.json(cfg || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

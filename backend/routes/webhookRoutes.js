@@ -2,18 +2,16 @@ const express = require("express");
 const router = express.Router();
 const { handleEngagementEnded } = require("../utils/zoom");
 
+// Webhook endpoint from Zoom
 router.post("/", async (req, res) => {
   try {
     const { event, payload } = req.body;
 
     console.log("📩 Webhook received:", event);
 
-    // Zoom sends: "contact_center.engagement_ended"
-    if (event === "contact_center.engagement_ended") {
+    if (event === "contact_center.engagement.ended") {
       const engagementId = payload.engagement_id;
       const accountId = payload.account_id || "default";
-
-      console.log(`🔔 Engagement ended. engagementId=${engagementId}, accountId=${accountId}`);
 
       await handleEngagementEnded(engagementId, accountId);
     }

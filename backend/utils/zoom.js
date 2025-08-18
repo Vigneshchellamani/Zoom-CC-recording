@@ -5,54 +5,56 @@ const Engagement = require("../models/Engagement");
 const ZoomConfig = require("../models/ZoomConfig");
 const { decrypt } = require("./crypto");
 
-/**
- * Resolve access token using per-company encrypted config if present.
- * Falls back to process.env if no company config stored.
- */
-async function getAccessToken(companyId = null) {
-  let clientId = process.env.ZOOM_CLIENT_ID || "";
-  let clientSecret = process.env.ZOOM_CLIENT_SECRET || "";
-  let accountId = process.env.ZOOM_ACCOUNT_ID || "";
+let cachedConfig = null; // keep in memory so we don’t query DB every time
 
-  if (companyId) {
-    const cfg = await ZoomConfig.findOne({ companyId });
-    if (cfg) {
-      clientId = decrypt(cfg.clientIdEnc);
-      clientSecret = decrypt(cfg.clientSecretEnc);
-      accountId = decrypt(cfg.accountIdEnc);
-    }
-  }
+// 🔑 Always fetch config once (from DB) and cache
+async function loadZoomConfig() {
+  if (cachedConfig) return cachedConfig;
+
+  const cfg = await ZoomConfig.findOne(); // only one admin config
+  if (!cfg) throw new Error("⚠️ No Zoom configuration found. Please set in admin panel.");
+
+  cachedConfig = {
+    clientId: decrypt(cfg.clientIdEnc),
+    clientSecret: decrypt(cfg.clientSecretEnc),
+    accountId: decrypt(cfg.accountIdEnc),
+  };
+
+  return cachedConfig;
+}
+
+async function getAccessToken() {
+  const { clientId, clientSecret, accountId } = await loadZoomConfig();
 
   const res = await axios.post("https://zoom.us/oauth/token", null, {
     params: { grant_type: "account_credentials", account_id: accountId },
-    auth: { username: clientId, password: clientSecret }
+    auth: { username: clientId, password: clientSecret },
   });
 
   return res.data.access_token;
 }
 
-/**
- * Query Zoom API for recordings of an engagement
- * Returns first recording (or throws).
- */
 async function getRecording(accessToken, engagementId) {
   const url = `https://api.zoom.us/v2/contact_center/engagements/${engagementId}/recordings`;
 
+  console.log(`📡 Fetching recording: ${url}`);
+
   const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
+  console.log("📂 Recording API response:", JSON.stringify(res.data, null, 2));
+
   const rec = res.data.recordings?.[0];
-  if (!rec) throw new Error("No recording found");
+  if (!rec) throw new Error("No recording found for engagement " + engagementId);
 
   const downloadUrl = rec.download_url;
-  // Prefer extension from API (if exposed), fallback to mp3
   const ext = rec.file_extension ? `.${rec.file_extension}` : ".mp3";
   const fileName = `${engagementId}${ext}`;
 
-  // Use start time if available from object else now
-  const startTime = res.data.start_time ? new Date(res.data.start_time) :
-                    rec.start_time ? new Date(rec.start_time) : new Date();
+  const startTime = res.data.start_time
+    ? new Date(res.data.start_time)
+    : new Date();
 
   return { downloadUrl, fileName, startTime, meta: res.data, recording: rec };
 }
@@ -60,29 +62,38 @@ async function getRecording(accessToken, engagementId) {
 async function streamDownload(downloadUrl, accessToken, absPath) {
   await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
 
+  console.log(`⬇️ Downloading recording to ${absPath}`);
+
   const writer = fs.createWriteStream(absPath);
   const res = await axios.get(downloadUrl, {
     responseType: "stream",
-    headers: { Authorization: `Bearer ${accessToken}` }
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   return new Promise((resolve, reject) => {
     res.data.pipe(writer);
-    writer.on("finish", () => resolve(absPath));
+    writer.on("finish", () => {
+      console.log("✅ Download complete:", absPath);
+      resolve(absPath);
+    });
     writer.on("error", reject);
   });
 }
 
-/**
- * Core handler. companyId is optional — if you can map from payload, pass it.
- */
-async function handleEngagementEnded(engagementId, companyId = "default") {
-  console.log(`⚙️ Handling engagement ${engagementId} (company: ${companyId})`);
-  const token = await getAccessToken(companyId);
-  const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
+async function handleEngagementEnded(engagementId) {
+  console.log(`⚙️ Handling engagement ${engagementId}`);
+
+  const token = await getAccessToken();
+  const { downloadUrl, fileName, startTime, recording } = await getRecording(
+    token,
+    engagementId
+  );
 
   const dir = path.join(
-    __dirname, "..", "uploads", "recordings",
+    __dirname,
+    "..",
+    "uploads",
+    "recordings",
     String(startTime.getFullYear()),
     String(startTime.getMonth() + 1).padStart(2, "0"),
     String(startTime.getDate()).padStart(2, "0")
@@ -91,13 +102,10 @@ async function handleEngagementEnded(engagementId, companyId = "default") {
   const absPath = path.join(dir, fileName);
   await streamDownload(downloadUrl, token, absPath);
 
-  // Save metadata (extend as needed)
   await Engagement.findOneAndUpdate(
     { engagementId },
     {
-      companyId,
       engagementId,
-      direction: recording.direction || "",
       startTime,
       duration: recording.duration || 0,
       agent: recording.agent_name || "",
@@ -105,15 +113,13 @@ async function handleEngagementEnded(engagementId, companyId = "default") {
       channel: recording.channel || "",
       flow: recording.flow_name || "",
       disposition: recording.disposition || "",
-      notes: "",
-      transcript: "",
       recordingUrl: downloadUrl,
-      s3Path: absPath
+      localPath: absPath,
     },
     { upsert: true, new: true }
   );
 
-  console.log(`✅ Saved engagement ${engagementId} to ${absPath}`);
+  console.log(`✅ Saved engagement ${engagementId} at ${absPath}`);
 }
 
-module.exports = { handleEngagementEnded };
+module.exports = { handleEngagementEnded, loadZoomConfig };
