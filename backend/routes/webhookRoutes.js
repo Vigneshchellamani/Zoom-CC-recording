@@ -2,24 +2,23 @@ const express = require("express");
 const router = express.Router();
 const { handleEngagementEnded } = require("../utils/zoom");
 
-// Webhook endpoint from Zoom
 router.post("/", async (req, res) => {
   try {
-    const { event, payload } = req.body;
+    const event = req.body.event;
+    if (event === "contact_center.engagement_ended") {
+      
+      const engagementId = req.body.payload?.object?.engagement_id;
+      console.log("📩 Webhook received for engagement:", engagementId);
 
-    console.log("📩 Webhook received:", event);
+      if (!engagementId) return res.status(400).send("Engagement ID missing");
 
-    if (event === "contact_center.engagement.ended") {
-      const engagementId = payload.engagement_id;
-      const accountId = payload.account_id || "default";
-
-      await handleEngagementEnded(engagementId, accountId);
+      // Download recording
+      await handleEngagementEnded(engagementId);
     }
-
-    res.status(200).send({ received: true });
+    res.status(200).send("Webhook processed");
   } catch (err) {
-    console.error("❌ Webhook error:", err.message);
-    res.status(500).send({ error: err.message });
+    console.error("❌ Error handling webhook:", err.message);
+    res.status(500).send("Webhook error");
   }
 });
 

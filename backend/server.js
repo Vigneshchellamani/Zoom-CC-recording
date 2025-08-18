@@ -7,21 +7,21 @@ const authRoutes = require("./routes/authRoutes");
 const engagementRoutes = require("./routes/engagementRoutes");
 const configRoutes = require("./routes/configRoutes");
 const zoomRoutes = require("./routes/zoomRoutes");
-const webhookRoutes = require("./routes/webhookRoutes"); // ✅ NEW
+const webhookRoutes = require("./routes/webhookRoutes");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
-// Static serve recordings (optional: secure this with auth)
+// Serve recordings
 app.use("/recordings", express.static(__dirname + "/uploads/recordings"));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/engagements", engagementRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/zoom", zoomRoutes);
-app.use("/webhook", webhookRoutes); // ✅ Webhook endpoint
+app.use("/webhook", webhookRoutes);
 
 const PORT = process.env.PORT || 5000;
 

@@ -5,21 +5,19 @@ const Engagement = require("../models/Engagement");
 const ZoomConfig = require("../models/ZoomConfig");
 const { decrypt } = require("./crypto");
 
-let cachedConfig = null; // keep in memory so we don’t query DB every time
+let cachedConfig = null;
 
-// 🔑 Always fetch config once (from DB) and cache
 async function loadZoomConfig() {
   if (cachedConfig) return cachedConfig;
 
-  const cfg = await ZoomConfig.findOne(); // only one admin config
-  if (!cfg) throw new Error("⚠️ No Zoom configuration found. Please set in admin panel.");
+  const cfg = await ZoomConfig.findOne();
+  if (!cfg) throw new Error("⚠️ No Zoom configuration found.");
 
   cachedConfig = {
     clientId: decrypt(cfg.clientIdEnc),
     clientSecret: decrypt(cfg.clientSecretEnc),
     accountId: decrypt(cfg.accountIdEnc),
   };
-
   return cachedConfig;
 }
 
@@ -43,8 +41,6 @@ async function getRecording(accessToken, engagementId) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  console.log("📂 Recording API response:", JSON.stringify(res.data, null, 2));
-
   const rec = res.data.recordings?.[0];
   if (!rec) throw new Error("No recording found for engagement " + engagementId);
 
@@ -52,9 +48,7 @@ async function getRecording(accessToken, engagementId) {
   const ext = rec.file_extension ? `.${rec.file_extension}` : ".mp3";
   const fileName = `${engagementId}${ext}`;
 
-  const startTime = res.data.start_time
-    ? new Date(res.data.start_time)
-    : new Date();
+  const startTime = res.data.start_time ? new Date(res.data.start_time) : new Date();
 
   return { downloadUrl, fileName, startTime, meta: res.data, recording: rec };
 }
@@ -84,10 +78,7 @@ async function handleEngagementEnded(engagementId) {
   console.log(`⚙️ Handling engagement ${engagementId}`);
 
   const token = await getAccessToken();
-  const { downloadUrl, fileName, startTime, recording } = await getRecording(
-    token,
-    engagementId
-  );
+  const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
 
   const dir = path.join(
     __dirname,
