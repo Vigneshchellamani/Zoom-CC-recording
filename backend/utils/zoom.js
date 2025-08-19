@@ -41,7 +41,8 @@ async function getRecording(accessToken, engagementId) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  const rec = res.data.recordings?.[0];
+  
+  const rec = res.data.recordings?.find(r => r.channel === "voice");
   if (!rec) throw new Error("No recording found for engagement " + engagementId);
 
   const downloadUrl = rec.download_url;
