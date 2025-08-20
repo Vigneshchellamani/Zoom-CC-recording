@@ -6,8 +6,8 @@ router.post("/", async (req, res) => {
   try {
     const event = req.body.event;
     if (event === "contact_center.engagement_ended") {
-      const engagementId = req.body.payload?.engagement?.id;
-      // const engagementId = req.body.payload?.object?.engagement_id;
+      // const engagementId = req.body.payload?.engagement?.id;
+      const engagementId = req.body.payload?.object?.engagement_id;
       console.log("📩 Webhook received for engagement:", engagementId);
 
       if (!engagementId) return res.status(400).send("Engagement ID missing");

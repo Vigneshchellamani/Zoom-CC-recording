@@ -25,11 +25,11 @@ export default function AgentDashboard() {
           </div>
           <div className="badge">Agent</div>
         </div>
-        <div className="cards">
+        {/* <div className="cards">
           <div className="card">
             Ready/Not Ready: <span className="pill pill-yellow">Not Ready</span>
           </div>
-        </div>
+        </div> */}
         <h3 style={{ marginTop: 20 }}>My Engagements</h3>
         <EngagementTable items={items} />
       </div>
