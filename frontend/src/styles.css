@@ -23,7 +23,7 @@ a { color: inherit; }
 /* Dashboard */
 .dashboard { display:flex; min-height: 100vh; }
 .sidebar {
-  width: 500px ; background:#0f172a; color:#e2e8f0; padding:20px; display:flex; flex-direction:column; gap:12px; flex: 2;
+  width: 240px; background:#0f172a; color:#e2e8f0; padding:20px; display:flex; flex-direction:column; gap:12px;
 }
 .sidebar h3 { margin: 0 0 6px; }
 .sidebar .muted { color:#94a3b8; font-size: 12px; }
