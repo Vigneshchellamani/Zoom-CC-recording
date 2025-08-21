@@ -23,7 +23,7 @@ const engagementSchema = new mongoose.Schema(
     recordingConsent: { type: Boolean, default: false },
     recordingUrl: { type: String, default: "" },    // Zoom download URL
     localPath: { type: String, default: "" },       // local saved path
-          
+    publicUrl: { type: String, default: "" },     
   },
   { timestamps: true }
 );

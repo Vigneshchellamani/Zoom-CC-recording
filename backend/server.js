@@ -15,6 +15,8 @@ app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
 // Serve recordings
+// app.use("/recordings", express.static(path.join(__dirname, "uploads","recordings")));
+
 app.use("/recordings", express.static(__dirname + "/uploads/recordings"));
 
 app.use("/api/auth", authRoutes);

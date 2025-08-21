@@ -31,6 +31,7 @@ export default function AdminDashboard() {
           </div>
         </div> */}
         <h3 style={{ marginTop: 20 }}>All Engagements</h3>
+        <EngagementTable items={items} />
       </div>
     </div>
   );
