@@ -147,6 +147,7 @@ export default function EngagementTable({ items }) {
               <th>Duration</th>
               <th>Recording</th>
               <th>Start Time</th>
+              
             </tr>
           </thead>
           <tbody>

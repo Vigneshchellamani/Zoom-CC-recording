@@ -79,15 +79,6 @@ async function handleEngagementEnded(engagementId) {
   console.log(`⚙️ Handling engagement ${engagementId}`);
 
   const token = await getAccessToken();
-
-  // Fetch full engagement info
-  const engagementRes = await axios.get(
-    `https://api.zoom.us/v2/contact_center/engagements/${engagementId}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  const engagementData = engagementRes.data;
-
-  // Fetch recording
   const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
 
   const dir = path.join(
@@ -99,6 +90,7 @@ async function handleEngagementEnded(engagementId) {
     String(startTime.getMonth() + 1).padStart(2, "0"),
     String(startTime.getDate()).padStart(2, "0")
   );
+
   const absPath = path.join(dir, fileName);
   
    // Public URL for frontend

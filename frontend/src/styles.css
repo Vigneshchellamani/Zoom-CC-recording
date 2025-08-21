@@ -47,7 +47,7 @@ a { color: inherit; }
 .config-form button { padding:12px 16px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; }
 
 /* Table */
-.engagement-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #e5e7eb; margin-top:12px; ;}
+.engagement-table { width:100%;table-layout: fixed; border-collapse:collapse; background:#fff; border:1px solid #e5e7eb; margin-top:12px; ;}
 .engagement-table th, .engagement-table td { padding:10px; border-bottom:1px solid #eef2f7; text-align:left; }
 .engagement-table th { background:#f8fafc; font-weight:600; }
 .engagement-table tr:hover { background:#fafafa; }

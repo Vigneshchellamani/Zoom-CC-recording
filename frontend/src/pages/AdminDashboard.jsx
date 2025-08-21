@@ -25,11 +25,11 @@ export default function AdminDashboard() {
           </div>
           <div className="badge">Admin</div>
         </div>
-        {/* <div className="cards">
+        <div className="cards">
           <div className="card">
             Ready/Not Ready: <span className="pill pill-green">Ready</span>
           </div>
-        </div> */}
+        </div>
         <h3 style={{ marginTop: 20 }}>All Engagements</h3>
         <EngagementTable items={items} />
       </div>
