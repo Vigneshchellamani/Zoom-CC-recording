@@ -11,6 +11,9 @@ const engagementSchema = new mongoose.Schema(
     handlingDuration: { type: Number, default: 0 }, // handling time in seconds
     wrapUpDuration: { type: Number, default: 0 },   // wrap-up time in seconds
     agent: { type: String, default: "" },
+    accept_type: { type: String, default: "" },
+    upgraded_to_channel_type: { type: String, default: "" },
+    transfer_type: { type: String, default: "" },
     queue: { type: String, default: "" },
     channel: { type: String, default: "" },         // voice, chat, etc.
     flow: { type: String, default: "" },

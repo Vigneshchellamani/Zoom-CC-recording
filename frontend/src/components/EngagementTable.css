@@ -27,7 +27,6 @@
   border-radius: 8px;
   font-size: 14px;
   background: #fff;
-  min-width: 160px;
 }
 
 .search-input {
@@ -48,10 +47,10 @@
 }
 
 .engagement-table {
-  width: 100%;
   border-collapse: collapse;
+  width: max-content;         /* allow table to extend horizontally */
+  min-width: 100%;            /* always at least full container width */
 }
-
 .engagement-table th,
 .engagement-table td {
   padding: 10px 12px;
@@ -84,3 +83,191 @@
   color: #999;
   font-style: italic;
 }
+
+
+ 
+.engagement-table-container {
+  width: 1000px;
+  max-width: 100%;
+  height: 500px;              /* fixed height */
+  overflow-x: auto;           /* horizontal scroll if too many columns */
+  overflow-y: auto;           /* vertical scroll if many rows */
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.engagement-table {
+  border-collapse: collapse;
+  width: max-content;         /* allow table to extend horizontally */
+  min-width: 100%;            /* always at least full container width */
+}
+
+/* .engagement-table th,
+.engagement-table td {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  white-space: nowrap;        /* prevent column text wrapping 
+} */
+
+.engagement-table thead {
+  position: sticky;
+  top: 0;
+  background: #f7f7f7;
+  z-index: 2;
+}
+.engagement-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f7f7f7;
+  z-index: 5;
+}
+
+/* .settings-wrapper {
+  position: relative;
+  margin-left: 12px;
+}
+
+.settings-btn {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.settings-dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 6px;
+  width: 220px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.settings-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.settings-confirm {
+  width: 100%;
+  padding: 6px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.settings-confirm:hover {
+  background: #0069d9;
+} */
+
+.settings-wrapper {
+  position: relative;
+  margin-left: auto; /* push settings to right side */
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  color: #333;
+}
+
+.settings-btn {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.settings-dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 6px;
+  width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+/* Each option row */
+.settings-option {
+  direction: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 4px 2px;
+  margin-bottom: 4px;
+  cursor: grab;
+}
+
+/* Drag handle (::) */
+.settings-handle {
+  cursor: grab;
+  font-size: 16px;
+  color: #666;
+  user-select: none;
+}
+
+/* Checkbox spacing */
+.settings-option input[type="checkbox"] {
+  accent-color: #007bff;
+  margin: 3px 0px 3px 0px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Confirm button */
+.settings-confirm {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.settings-confirm:hover {
+  background: #0069d9;
+}
+
+
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.pagination button {
+  padding: 4px 8px;
+  margin: 0 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+

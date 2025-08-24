@@ -14,6 +14,32 @@ export default function EngagementTable({ items }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
+  // column visibility state
+  const allColumns = [
+    "Engagement ID",
+    "Direction",
+    "Consumer",
+    "Channel",
+    "Agent",
+    "Queue",
+    "Flow",
+    "Duration",
+    "Recording",
+    "Start Time",
+    "Transfer_type",
+    "Upgraded_to_channel_type",
+    "Accept_type",
+  ];
+
+  const [visibleColumns, setVisibleColumns] = useState(allColumns);
+  const [openSettings, setOpenSettings] = useState(false);
+
+  const toggleColumn = (col) => {
+    setVisibleColumns((prev) =>
+      prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]
+    );
+  };
+
   const formatDate = (date) => {
     if (!date) return "-";
     return new Date(date).toLocaleString("en-US", {
@@ -132,6 +158,36 @@ export default function EngagementTable({ items }) {
         <button className="filter-btn" onClick={clearFilters}>
           Clear All
         </button>
+
+        {/* ⚙️ Settings Icon */}
+        <div className="settings-wrapper">
+          <button
+            className="settings-btn"
+            onClick={() => setOpenSettings(!openSettings)}
+          >
+            <img src="/gear.png" alt="settings" width={20} height={20} />
+          </button>
+          {openSettings && (
+            <div className="settings-dropdown">
+              {allColumns.map((col) => (
+                <label key={col} className="settings-option">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.includes(col)}
+                    onChange={() => toggleColumn(col)}
+                  />
+                  {col}
+                </label>
+              ))}
+              <button
+                onClick={() => setOpenSettings(false)}
+                className="settings-confirm"
+              >
+                Confirm
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 📊 Engagement Table */}
@@ -139,48 +195,87 @@ export default function EngagementTable({ items }) {
         <table className="engagement-table">
           <thead>
             <tr>
-              <th>Engagement ID</th>
-              <th>Direction</th>
-              <th>Channel</th>
-              <th>Agent</th>
-              <th>Queue</th>
-              <th>Duration</th>
-              <th>Recording</th>
-              <th>Start Time</th>
-              
+              {visibleColumns.includes("Engagement ID") && (
+                <th>Engagement ID</th>
+              )}
+              {visibleColumns.includes("Direction") && <th>Direction</th>}
+              {visibleColumns.includes("Consumer") && <th>Consumer</th>}
+              {visibleColumns.includes("Channel") && <th>Channel</th>}
+              {visibleColumns.includes("Agent") && <th>Agent</th>}
+              {visibleColumns.includes("Queue") && <th>Queue</th>}
+              {visibleColumns.includes("Flow") && <th>Flow</th>}
+              {visibleColumns.includes("Duration") && <th>Duration</th>}
+              {visibleColumns.includes("Recording") && <th>Recording</th>}
+              {visibleColumns.includes("Start Time") && <th>Start Time</th>}
+              {visibleColumns.includes("Transfer_type") && (
+                <th>Transfer_type</th>
+              )}
+              {visibleColumns.includes("Upgraded_to_channel_type") && (
+                <th>Upgraded_to_channel_type</th>
+              )}
+              {visibleColumns.includes("Accept_type") && <th>Accept_type</th>}
             </tr>
           </thead>
           <tbody>
             {paginatedItems.length ? (
               paginatedItems.map((e) => (
                 <tr key={e.engagementId}>
-                  <td>
-                    <span className="link">{e.engagementId}</span>
-                  </td>
-                  <td>{e.direction || "-"}</td>
-                  <td>{e.channel || "-"}</td>
-                  <td>{e.agent || "-"}</td>
-                  <td>{e.queue || "-"}</td>
-                  <td>{formatDuration(e.duration)}</td>
-                  <td>
-                    {e.publicUrl ? (
-                      <audio controls className="audio-player">
-                        <source
-                          src={`http://localhost:5000${e.publicUrl}`}
-                          type="audio/mp3"
-                        />
-                        Your browser does not support the audio element.
-                      </audio>
-                    ) : (
-                      <span className="no-recording">No Recording</span>
-                    )}
-                  </td>
-                  <td>{formatDate(e.startTime)}</td>
+                  {visibleColumns.includes("Engagement ID") && (
+                    <td>
+                      <span className="link">{e.engagementId}</span>
+                    </td>
+                  )}
+                  {visibleColumns.includes("Direction") && (
+                    <td>{e.direction || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Consumer") && (
+                    <td>{e.consumer || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Channel") && (
+                    <td>{e.channel || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Agent") && (
+                    <td>{e.agent || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Queue") && (
+                    <td>{e.queue || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Flow") && <td>{e.flow || "-"}</td>}
+                  {visibleColumns.includes("Duration") && (
+                    <td>{formatDuration(e.duration)}</td>
+                  )}
+                  {visibleColumns.includes("Recording") && (
+                    <td>
+                      {e.publicUrl ? (
+                        <audio controls className="audio-player">
+                          <source
+                            src={`http://localhost:5000${e.publicUrl}`}
+                            type="audio/mp3"
+                          />
+                          Your browser does not support the audio element.
+                        </audio>
+                      ) : (
+                        <span className="no-recording">No Recording</span>
+                      )}
+                    </td>
+                  )}
+                  {visibleColumns.includes("Start Time") && (
+                    <td>{formatDate(e.startTime)}</td>
+                  )}
+                  {visibleColumns.includes("Accept_type") && (
+                    <td>{e.accept_type || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Transfer_type:") && (
+                    <td>{e.transfer_type || "-"}</td>
+                  )}
+                  {visibleColumns.includes("Upgraded_to_channel_type") && (
+                    <td>{e.upgraded_to_channel_type || "-"}</td>
+                  )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="no-data">
+                <td colSpan="9" className="no-data">
                   No data available
                 </td>
               </tr>
