@@ -10,26 +10,31 @@ const router = express.Router();
 router.get("/zoom", auth, roles("admin"), async (req, res) => {
   const cfg = await ZoomConfig.findOne({ companyId: req.user.companyId });
   if (!cfg) return res.json(null);
+
   res.json({
     clientId: "****" + decrypt(cfg.clientIdEnc).slice(-4),
-    accountId: "****" + decrypt(cfg.accountIdEnc).slice(-4)
+    accountId: "****" + decrypt(cfg.accountIdEnc).slice(-4),
+    downloadPath: cfg.downloadPath || "" // ✅ return saved path
     // Never return clientSecret in plain
   });
 });
 
 // Save/Update zoom config (admin)
 router.post("/zoom", auth, roles("admin"), async (req, res) => {
-  const { clientId, clientSecret, accountId } = req.body;
+  const { clientId, clientSecret, accountId, downloadPath } = req.body; // ✅ extract it
+
   const doc = await ZoomConfig.findOneAndUpdate(
     { companyId: req.user.companyId },
     {
       companyId: req.user.companyId,
       clientIdEnc: encrypt(clientId),
       clientSecretEnc: encrypt(clientSecret),
-      accountIdEnc: encrypt(accountId)
+      accountIdEnc: encrypt(accountId),
+      downloadPath: downloadPath || "", // ✅ store safely
     },
     { upsert: true, new: true }
   );
+
   res.json({ ok: true });
 });
 

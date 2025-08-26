@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import api from "../services/api";
+import DownloadPath from "../components/DownloadPath";
 
 export default function ZoomConfig() {
   const [form, setForm] = useState({
     clientId: "",
     clientSecret: "",
     accountId: "",
+    downloadPath: "",
   });
   const [mask, setMask] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -63,6 +65,11 @@ export default function ZoomConfig() {
             value={form.accountId}
             onChange={(e) => setForm({ ...form, accountId: e.target.value })}
             required
+          />
+          {/* ✅ Our new component */}
+          <DownloadPath
+            value={form.downloadPath}
+            onChange={(val) => setForm({ ...form, downloadPath: val })}
           />
           <button disabled={saving}>{saving ? "Saving..." : "Save"}</button>
         </form>

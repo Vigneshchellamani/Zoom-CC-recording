@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import "./EngagementTable.css";
 import RecordingModal from "./RecordingModal";
 
@@ -15,7 +17,7 @@ export default function EngagementTable({ items }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
-  // column visibility state
+  // column visibility
   const allColumns = [
     "Engagement ID",
     "Direction",
@@ -30,14 +32,15 @@ export default function EngagementTable({ items }) {
     "Transfer_type",
     "Upgraded_to_channel_type",
     "Accept_type",
+    "Download",
   ];
-
   const [visibleColumns, setVisibleColumns] = useState(allColumns);
   const [openSettings, setOpenSettings] = useState(false);
 
-  // 📌 new state for modal
+  // modal
   const [selectedEngagement, setSelectedEngagement] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
 
   const toggleColumn = (col) => {
     setVisibleColumns((prev) =>
@@ -65,7 +68,74 @@ export default function EngagementTable({ items }) {
     return `${h}:${m}:${s}`;
   };
 
-  // Apply filters
+  const triggerDownload = (url, filename) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+  };
+
+  const handleDownload = async (engagement, type) => {
+    // 🎵 Recording only
+    if (type === "recording") {
+      if (engagement.publicUrl) {
+        triggerDownload(engagement.publicUrl, `${engagement.engagementId}.mp3`);
+      } else {
+        alert("No recording available!");
+      }
+      return;
+    }
+
+    // 📝 Transcript only
+    if (type === "transcript") {
+      if (engagement.transcript?.length) {
+        const textContent = engagement.transcript
+          .map((t) => `[${t.time}] ${t.speaker}: ${t.text}`)
+          .join("\n");
+        const blob = new Blob([textContent], { type: "text/plain" });
+        triggerDownload(
+          URL.createObjectURL(blob),
+          `${engagement.engagementId}.txt`
+        );
+      } else {
+        alert("No transcript available!");
+      }
+      return;
+    }
+
+    // 📦 Both → create ZIP
+    if (type === "both") {
+      const zip = new JSZip();
+
+      // Add recording if available
+      if (engagement.publicUrl) {
+        const response = await fetch(engagement.publicUrl);
+        const blob = await response.blob();
+        zip.file(`${engagement.engagementId}.mp3`, blob);
+      }
+
+      // Add transcript if available
+      if (engagement.transcript?.length) {
+        const textContent = engagement.transcript
+          .map((t) => `[${t.time}] ${t.speaker}: ${t.text}`)
+          .join("\n");
+        zip.file(`${engagement.engagementId}.txt`, textContent);
+      }
+
+      // If nothing to zip
+      if (!engagement.publicUrl && !engagement.transcript?.length) {
+        alert("No recording or transcript available to download!");
+        return;
+      }
+
+      // Generate and download ZIP
+      zip.generateAsync({ type: "blob" }).then((content) => {
+        saveAs(content, `${engagement.engagementId}.zip`);
+      });
+    }
+  };
+
+  // filtering
   const filteredItems = items.filter((e) => {
     const matchesSearch =
       e.engagementId?.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,7 +165,6 @@ export default function EngagementTable({ items }) {
     );
   });
 
-  // pagination logic
   const totalResults = filteredItems.length;
   const totalPages = Math.ceil(totalResults / pageSize);
   const paginatedItems = filteredItems.slice(
@@ -115,7 +184,7 @@ export default function EngagementTable({ items }) {
 
   return (
     <div className="engagement-table-wrapper">
-      {/* 🔎 Filter Controls */}
+      {/* Filters */}
       <div className="filter-bar">
         <input
           type="text"
@@ -144,7 +213,7 @@ export default function EngagementTable({ items }) {
         </select>
 
         <select value={channel} onChange={(e) => setChannel(e.target.value)}>
-          <option value="">Channel / Source (All)</option>
+          <option value="">Channel (All)</option>
           {[...new Set(items.map((i) => i.channel))].map(
             (c) => c && <option key={c}>{c}</option>
           )}
@@ -164,13 +233,13 @@ export default function EngagementTable({ items }) {
           Clear All
         </button>
 
-        {/* ⚙️ Settings Icon */}
+        {/* ⚙️ Settings */}
         <div className="settings-wrapper">
           <button
             className="settings-btn"
             onClick={() => setOpenSettings(!openSettings)}
           >
-            <img src="/gear.png" alt="settings" width={20} height={20} />
+            ⚙️
           </button>
           {openSettings && (
             <div className="settings-dropdown">
@@ -195,7 +264,7 @@ export default function EngagementTable({ items }) {
         </div>
       </div>
 
-      {/* 📊 Engagement Table */}
+      {/* Table */}
       <div className="engagement-table-container">
         <table className="engagement-table">
           <thead>
@@ -211,6 +280,7 @@ export default function EngagementTable({ items }) {
               {visibleColumns.includes("Flow") && <th>Flow</th>}
               {visibleColumns.includes("Duration") && <th>Duration</th>}
               {visibleColumns.includes("Recording") && <th>Recording</th>}
+              {visibleColumns.includes("Download") && <th>Download</th>}
               {visibleColumns.includes("Start Time") && <th>Start Time</th>}
               {visibleColumns.includes("Transfer_type") && (
                 <th>Transfer_type</th>
@@ -266,13 +336,59 @@ export default function EngagementTable({ items }) {
                       )}
                     </td>
                   )}
+                  {visibleColumns.includes("Download") && (
+                    <td>
+                      <div className="dropdown">
+                        <button
+                          className="dropdown-toggle"
+                          onClick={() =>
+                            setOpenDropdown(
+                              openDropdown === e.engagementId
+                                ? null
+                                : e.engagementId
+                            )
+                          }
+                        >
+                          Download
+                        </button>
+                        {openDropdown === e.engagementId && (
+                          <div className="dropdown-menu">
+                            <button
+                              onClick={() => {
+                                handleDownload(e, "recording");
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Recording
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDownload(e, "transcript");
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Transcript
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDownload(e, "both");
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Both (ZIP)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   {visibleColumns.includes("Start Time") && (
                     <td>{formatDate(e.startTime)}</td>
                   )}
                   {visibleColumns.includes("Accept_type") && (
                     <td>{e.accept_type || "-"}</td>
                   )}
-                  {visibleColumns.includes("Transfer_type:") && (
+                  {visibleColumns.includes("Transfer_type") && (
                     <td>{e.transfer_type || "-"}</td>
                   )}
                   {visibleColumns.includes("Upgraded_to_channel_type") && (
@@ -291,7 +407,7 @@ export default function EngagementTable({ items }) {
         </table>
       </div>
 
-      {/* 📌 Pagination Footer */}
+      {/* Pagination */}
       <div className="table-footer">
         <div className="pagination">
           <button
@@ -315,8 +431,9 @@ export default function EngagementTable({ items }) {
             value={pageSize}
             onChange={(e) => {
               setPageSize(Number(e.target.value));
-              setCurrentPage(1); // reset to first page
+              setCurrentPage(1);
             }}
+            className="page-size-select"
           >
             <option value={10}>10/page</option>
             <option value={15}>15/page</option>

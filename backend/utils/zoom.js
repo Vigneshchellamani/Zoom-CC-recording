@@ -72,6 +72,7 @@ async function getRecording(accessToken, engagementId, attempt = 1) {
   }
 }
 
+
 async function streamDownload(downloadUrl, accessToken, absPath) {
   await fs.promises.mkdir(path.dirname(absPath), { recursive: true });
 
@@ -93,8 +94,130 @@ async function streamDownload(downloadUrl, accessToken, absPath) {
   });
 }
 
+// async function handleEngagementEnded(engagementId) {
+//   console.log(`⚙️ Handling engagement ${engagementId}`);
+
+//   const token = await getAccessToken();
+
+//   // Fetch engagement metadata
+//   const engagementData = await getEngagement(token, engagementId);
+
+//   // Retry for recording if not ready
+//   const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
+
+//   const cfg = await ZoomConfig.findOne();
+//   const basePath = cfg?.downloadPath || "";
+
+//   const dir = path.join(
+//     basePath,
+//     "recordings",
+//     String(startTime.getFullYear()),
+//     String(startTime.getMonth() + 1).padStart(2, "0"),
+//     String(startTime.getDate()).padStart(2, "0")
+//   );
+
+//   const absPath = path.join(dir, fileName);
+
+//   const publicUrl = `/recordings/${startTime.getFullYear()}/${String(
+//     startTime.getMonth() + 1
+//   ).padStart(2, "0")}/${String(startTime.getDate()).padStart(2, "0")}/${fileName}`;
+
+//   await streamDownload(downloadUrl, token, absPath);
+
+//   const consumerName = engagementData.consumers?.[0]?.consumer_display_name;
+//   const consumerNumber = engagementData.consumers?.[0]?.consumer_number;
+//   const consumerField =
+//     consumerName && consumerNumber
+//       ? `${consumerName}\n${consumerNumber}`
+//       : consumerName
+//       ? consumerName
+//       : consumerNumber
+//       ? consumerNumber
+//       : "-";
+
+//   // ✅ Fetch & parse transcript
+//   let transcriptLines = [];
+//   if (recording.transcript_url) {
+//     try {
+//       const transcriptRes = await axios.get(recording.transcript_url, {
+//         headers: { Authorization: `Bearer ${token}` },
+//         responseType: "text",
+//       });
+
+//       const vttData = transcriptRes.data;
+//       const lines = vttData.split("\n");
+//       let currentTime = "";
+
+//       lines.forEach((line) => {
+//         line = line.trim();
+//         if (!line || line === "WEBVTT" || /^[0-9]+$/.test(line)) return;
+
+//         if (line.includes("-->")) {
+//           currentTime = line.split("-->")[0].trim().split(".")[0]; // start time
+//         } else if (line.includes(":")) {
+//           const [speaker, ...msgParts] = line.split(":");
+//           transcriptLines.push({
+//             speaker: speaker.trim(),
+//             time: currentTime,
+//             text: msgParts.join(":").trim(),
+//           });
+//         }
+//       });
+
+//       console.log(`📝 Parsed ${transcriptLines.length} transcript lines`);
+//     } catch (err) {
+//       console.log("⚠️ Could not fetch transcript:", err.message);
+//     }
+//   }
+
+//   // Save full engagement with transcript to MongoDB
+//   await Engagement.findOneAndUpdate(
+//     { engagementId },
+//     {
+//       engagementId,
+//       startTime,
+//       duration: recording.duration || engagementData.duration || 0,
+//       consumer: consumerField,
+//       agent: engagementData.agents?.map(a => a.display_name).join(", ") || "",
+//       queue: engagementData.queues?.[0]?.queue_name || "",
+//       flow: engagementData.flows?.[0]?.flow_name || "",
+//       disposition: Array.isArray(engagementData.dispositions)
+//         ? engagementData.dispositions[0]?.name || ""
+//         : engagementData.disposition || "",
+//       notes: Array.isArray(engagementData.notes)
+//         ? engagementData.notes.map(note => note.content || "").join(" | ")
+//         : "",
+//       channel: recording.channel || engagementData.channel || "",
+//       recordingUrl: downloadUrl,
+//       localPath: absPath,
+//       publicUrl,
+//       transfer_type: engagementData.transfer_type || "-",
+//       upgraded_to_channel_type: engagementData.upgraded_to_channel_type || "-",
+//       accept_type: engagementData.events?.some(e => e.event_type === "Agent Accept") ? "manual" : "-",
+//       direction: engagementData.direction || "",
+//       source: engagementData.source || "",
+//       waitingDuration: engagementData.waiting_duration || 0,
+//       handlingDuration: engagementData.handling_duration || 0,
+//       wrapUpDuration: engagementData.wrap_up_duration || 0,
+//       transcript: transcriptLines, // ✅ store parsed transcript
+//       voicemail: engagementData.voice_mail ? true : false,
+//       recordingConsent: engagementData.recording_consent || false,
+//     },
+//     { upsert: true, new: true }
+//   );
+
+//   console.log(`✅ Saved full engagement info with transcript for ${engagementId}`);
+// }
+
 async function handleEngagementEnded(engagementId) {
   console.log(`⚙️ Handling engagement ${engagementId}`);
+
+  // ✅ Step 1: Check if already processed
+  const existing = await Engagement.findOne({ engagementId });
+  if (existing?.localPath && fs.existsSync(existing.localPath)) {
+    console.log(`⚠️ Engagement ${engagementId} already processed, skipping.`);
+    return;
+  }
 
   const token = await getAccessToken();
 
@@ -104,10 +227,11 @@ async function handleEngagementEnded(engagementId) {
   // Retry for recording if not ready
   const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
 
+  const cfg = await ZoomConfig.findOne();
+  const basePath = cfg?.downloadPath || "";
+
   const dir = path.join(
-    __dirname,
-    "..",
-    "uploads",
+    basePath,
     "recordings",
     String(startTime.getFullYear()),
     String(startTime.getMonth() + 1).padStart(2, "0"),
@@ -120,18 +244,19 @@ async function handleEngagementEnded(engagementId) {
     startTime.getMonth() + 1
   ).padStart(2, "0")}/${String(startTime.getDate()).padStart(2, "0")}/${fileName}`;
 
-  await streamDownload(downloadUrl, token, absPath);
+  // ✅ Step 2: Download only if file doesn’t exist
+  if (!fs.existsSync(absPath)) {
+    await streamDownload(downloadUrl, token, absPath);
+  } else {
+    console.log(`📂 Recording file already exists: ${absPath}`);
+  }
 
   const consumerName = engagementData.consumers?.[0]?.consumer_display_name;
   const consumerNumber = engagementData.consumers?.[0]?.consumer_number;
   const consumerField =
     consumerName && consumerNumber
       ? `${consumerName}\n${consumerNumber}`
-      : consumerName
-      ? consumerName
-      : consumerNumber
-      ? consumerNumber
-      : "-";
+      : consumerName || consumerNumber || "-";
 
   // ✅ Fetch & parse transcript
   let transcriptLines = [];
@@ -173,7 +298,7 @@ async function handleEngagementEnded(engagementId) {
     { engagementId },
     {
       engagementId,
-      startTime,
+      startTime:recording.startTime ? new Date(recording.startTime) : new Date(),
       duration: recording.duration || engagementData.duration || 0,
       consumer: consumerField,
       agent: engagementData.agents?.map(a => a.display_name).join(", ") || "",
@@ -197,7 +322,7 @@ async function handleEngagementEnded(engagementId) {
       waitingDuration: engagementData.waiting_duration || 0,
       handlingDuration: engagementData.handling_duration || 0,
       wrapUpDuration: engagementData.wrap_up_duration || 0,
-      transcript: transcriptLines, // ✅ store parsed transcript
+      transcript: transcriptLines,
       voicemail: engagementData.voice_mail ? true : false,
       recordingConsent: engagementData.recording_consent || false,
     },
@@ -206,5 +331,6 @@ async function handleEngagementEnded(engagementId) {
 
   console.log(`✅ Saved full engagement info with transcript for ${engagementId}`);
 }
+
 
 module.exports = { handleEngagementEnded, loadZoomConfig };
