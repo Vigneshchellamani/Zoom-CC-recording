@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "./EngagementTable.css";
+import RecordingModal from "./RecordingModal";
 
 export default function EngagementTable({ items }) {
   const [search, setSearch] = useState("");
@@ -33,6 +34,10 @@ export default function EngagementTable({ items }) {
 
   const [visibleColumns, setVisibleColumns] = useState(allColumns);
   const [openSettings, setOpenSettings] = useState(false);
+
+  // 📌 new state for modal
+  const [selectedEngagement, setSelectedEngagement] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const toggleColumn = (col) => {
     setVisibleColumns((prev) =>
@@ -247,13 +252,15 @@ export default function EngagementTable({ items }) {
                   {visibleColumns.includes("Recording") && (
                     <td>
                       {e.publicUrl ? (
-                        <audio controls className="audio-player">
-                          <source
-                            src={`http://localhost:5000${e.publicUrl}`}
-                            type="audio/mp3"
-                          />
-                          Your browser does not support the audio element.
-                        </audio>
+                        <button
+                          onClick={() => {
+                            setSelectedEngagement(e);
+                            setModalOpen(true);
+                          }}
+                          className="play-btn"
+                        >
+                          ▶ Play
+                        </button>
                       ) : (
                         <span className="no-recording">No Recording</span>
                       )}
@@ -319,6 +326,13 @@ export default function EngagementTable({ items }) {
           <span style={{ marginLeft: 8 }}>{totalResults} result(s)</span>
         </div>
       </div>
+
+      {/* 🎤 Recording Modal */}
+      <RecordingModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        engagement={selectedEngagement}
+      />
     </div>
   );
 }

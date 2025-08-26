@@ -98,10 +98,10 @@ async function handleEngagementEnded(engagementId) {
 
   const token = await getAccessToken();
 
-  // ✅ Fetch engagement metadata first
+  // Fetch engagement metadata
   const engagementData = await getEngagement(token, engagementId);
 
-  // ✅ Retry for recording if not ready
+  // Retry for recording if not ready
   const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
 
   const dir = path.join(
@@ -116,45 +116,75 @@ async function handleEngagementEnded(engagementId) {
 
   const absPath = path.join(dir, fileName);
 
-  // Public URL for frontend
   const publicUrl = `/recordings/${startTime.getFullYear()}/${String(
     startTime.getMonth() + 1
   ).padStart(2, "0")}/${String(startTime.getDate()).padStart(2, "0")}/${fileName}`;
 
   await streamDownload(downloadUrl, token, absPath);
 
-   const consumerName = engagementData.consumers?.[0]?.consumer_display_name;
-   const consumerNumber = engagementData.consumers?.[0]?.consumer_number;
-   const consumerField =
-  consumerName && consumerNumber
-    ? `${consumerName}\n${consumerNumber}`
-    : consumerName
-    ? consumerName
-    : consumerNumber
-    ? consumerNumber
-    : "-";
-  //  const consumerField = `${consumerName}\n${consumerNumber}`;
+  const consumerName = engagementData.consumers?.[0]?.consumer_display_name;
+  const consumerNumber = engagementData.consumers?.[0]?.consumer_number;
+  const consumerField =
+    consumerName && consumerNumber
+      ? `${consumerName}\n${consumerNumber}`
+      : consumerName
+      ? consumerName
+      : consumerNumber
+      ? consumerNumber
+      : "-";
 
+  // ✅ Fetch & parse transcript
+  let transcriptLines = [];
+  if (recording.transcript_url) {
+    try {
+      const transcriptRes = await axios.get(recording.transcript_url, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "text",
+      });
+
+      const vttData = transcriptRes.data;
+      const lines = vttData.split("\n");
+      let currentTime = "";
+
+      lines.forEach((line) => {
+        line = line.trim();
+        if (!line || line === "WEBVTT" || /^[0-9]+$/.test(line)) return;
+
+        if (line.includes("-->")) {
+          currentTime = line.split("-->")[0].trim().split(".")[0]; // start time
+        } else if (line.includes(":")) {
+          const [speaker, ...msgParts] = line.split(":");
+          transcriptLines.push({
+            speaker: speaker.trim(),
+            time: currentTime,
+            text: msgParts.join(":").trim(),
+          });
+        }
+      });
+
+      console.log(`📝 Parsed ${transcriptLines.length} transcript lines`);
+    } catch (err) {
+      console.log("⚠️ Could not fetch transcript:", err.message);
+    }
+  }
+
+  // Save full engagement with transcript to MongoDB
   await Engagement.findOneAndUpdate(
     { engagementId },
     {
       engagementId,
       startTime,
       duration: recording.duration || engagementData.duration || 0,
-      // consumer_number: data.consumers?.[0]?.consumer_number || "-",
       consumer: consumerField,
-      // consumer: engagementData.consumers?.[0]?.consumer_display_name || "",
       agent: engagementData.agents?.map(a => a.display_name).join(", ") || "",
       queue: engagementData.queues?.[0]?.queue_name || "",
       flow: engagementData.flows?.[0]?.flow_name || "",
       disposition: Array.isArray(engagementData.dispositions)
         ? engagementData.dispositions[0]?.name || ""
         : engagementData.disposition || "",
-
       notes: Array.isArray(engagementData.notes)
         ? engagementData.notes.map(note => note.content || "").join(" | ")
         : "",
-
       channel: recording.channel || engagementData.channel || "",
       recordingUrl: downloadUrl,
       localPath: absPath,
@@ -167,100 +197,14 @@ async function handleEngagementEnded(engagementId) {
       waitingDuration: engagementData.waiting_duration || 0,
       handlingDuration: engagementData.handling_duration || 0,
       wrapUpDuration: engagementData.wrap_up_duration || 0,
-      transcript: engagementData.transcript_url || "",
+      transcript: transcriptLines, // ✅ store parsed transcript
       voicemail: engagementData.voice_mail ? true : false,
       recordingConsent: engagementData.recording_consent || false,
     },
     { upsert: true, new: true }
   );
 
-  console.log(`✅ Saved full engagement info for ${engagementId} at ${absPath}`);
+  console.log(`✅ Saved full engagement info with transcript for ${engagementId}`);
 }
-
-// async function handleEngagementEnded(engagementId) {
-//   console.log(`⚙️ Handling engagement ${engagementId}`);
-
-//   const token = await getAccessToken();
-
-//   // ✅ Fetch engagement metadata first
-//   const engagementData = await getEngagement(token, engagementId);
-
-//   // ✅ Skip non-voice/video channels
-//   if (!["voice", "video"].includes(engagementData.channel)) {
-//     console.log(`ℹ️ Skipping engagement ${engagementId}, channel = ${engagementData.channel}`);
-//     return;
-//   }
-
-//   // ✅ Retry for recording if not ready
-//   const { downloadUrl, fileName, startTime, recording } = await getRecording(token, engagementId);
-
-//   const dir = path.join(
-//     __dirname,
-//     "..",
-//     "uploads",
-//     "recordings",
-//     String(startTime.getFullYear()),
-//     String(startTime.getMonth() + 1).padStart(2, "0"),
-//     String(startTime.getDate()).padStart(2, "0")
-//   );
-
-//   const absPath = path.join(dir, fileName);
-
-//   // Public URL for frontend
-//   const publicUrl = `/recordings/${startTime.getFullYear()}/${String(
-//     startTime.getMonth() + 1
-//   ).padStart(2, "0")}/${String(startTime.getDate()).padStart(2, "0")}/${fileName}`;
-
-//   await streamDownload(downloadUrl, token, absPath);
-
-//   const consumerName = engagementData.consumers?.[0]?.consumer_display_name;
-//   const consumerNumber = engagementData.consumers?.[0]?.consumer_number;
-//   const consumerField =
-//     consumerName && consumerNumber
-//       ? `${consumerName}\n${consumerNumber}`
-//       : consumerName
-//       ? consumerName
-//       : consumerNumber
-//       ? consumerNumber
-//       : "-";
-
-//   await Engagement.findOneAndUpdate(
-//     { engagementId },
-//     {
-//       engagementId,
-//       startTime,
-//       duration: recording.duration || engagementData.duration || 0,
-//       consumer: consumerField,
-//       agent: engagementData.agents?.map(a => a.display_name).join(", ") || "",
-//       queue: engagementData.queues?.[0]?.queue_name || "",
-//       flow: engagementData.flows?.[0]?.flow_name || "",
-//       disposition: Array.isArray(engagementData.dispositions)
-//         ? engagementData.dispositions[0]?.name || ""
-//         : engagementData.disposition || "",
-//       notes: Array.isArray(engagementData.notes)
-//         ? engagementData.notes.map(note => note.content || "").join(" | ")
-//         : "",
-//       channel: recording.channel || engagementData.channel || "",
-//       recordingUrl: downloadUrl,
-//       localPath: absPath,
-//       publicUrl,
-//       transfer_type: data.transfer_type || "-",
-//       upgraded_to_channel_type: data.upgraded_to_channel_type || "-",
-//       accept_type: engagementData.events?.some(e => e.event_type === "Agent Accept") ? "manual" : "-",
-//       direction: engagementData.direction || "",
-//       source: engagementData.source || "",
-//       waitingDuration: engagementData.waiting_duration || 0,
-//       handlingDuration: engagementData.handling_duration || 0,
-//       wrapUpDuration: engagementData.wrap_up_duration || 0,
-//       transcript: engagementData.transcript_url || "",
-//       voicemail: engagementData.voice_mail ? true : false,
-//       recordingConsent: engagementData.recording_consent || false,
-//     },
-//     { upsert: true, new: true }
-//   );
-
-//   console.log(`✅ Saved full engagement info for ${engagementId} at ${absPath}`);
-// }
-
 
 module.exports = { handleEngagementEnded, loadZoomConfig };

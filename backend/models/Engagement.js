@@ -21,7 +21,13 @@ const engagementSchema = new mongoose.Schema(
     consumer: { type: String, default: "" },        // customer name
     source: { type: String, default: "" },          // source info
     notes: { type: String, default: "" },
-    transcript: { type: String, default: "" },
+    transcript: [
+    {
+      speaker: String,
+      time: String,
+      text: String,
+    },
+  ],
     voicemail: { type: Boolean, default: false },
     recordingConsent: { type: Boolean, default: false },
     recordingUrl: { type: String, default: "" },    // Zoom download URL
