@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import JSZip from "jszip";
+
 import { saveAs } from "file-saver";
 import "./EngagementTable.css";
+import axios from "axios";
 import RecordingModal from "./RecordingModal";
 
 export default function EngagementTable({ items }) {
@@ -13,7 +15,7 @@ export default function EngagementTable({ items }) {
   const [direction, setDirection] = useState("");
   const [agent, setAgent] = useState("");
 
-  // pagination
+  // pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
@@ -42,12 +44,6 @@ export default function EngagementTable({ items }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
 
-  // ✅ selected engagements for bulk download
-  const [selectedEngagements, setSelectedEngagements] = useState([]);
-
-  const backendHost = "http://localhost:5000"; // backend host
-
-  // helper functions
   const toggleColumn = (col) => {
     setVisibleColumns((prev) =>
       prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]
@@ -74,68 +70,19 @@ export default function EngagementTable({ items }) {
     return `${h}:${m}:${s}`;
   };
 
-  // ✅ toggle single engagement
-  const toggleSelection = (id) => {
-    setSelectedEngagements((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  const backendHost = "http://localhost:5000"; // ✅ backend serving /recordings
+
+  const triggerDownload = (url, filename) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  // ✅ select all in page
-  const toggleSelectAll = () => {
-    const pageIds = paginatedItems.map((e) => e.engagementId);
-    const allSelected = pageIds.every((id) => selectedEngagements.includes(id));
-
-    if (allSelected) {
-      setSelectedEngagements((prev) =>
-        prev.filter((id) => !pageIds.includes(id))
-      );
-    } else {
-      setSelectedEngagements((prev) => [...new Set([...prev, ...pageIds])]);
-    }
-  };
-
-  // ✅ bulk download function
-  const handleBulkDownload = async () => {
-    if (!selectedEngagements.length) {
-      alert("Please select at least one engagement!");
-      return;
-    }
-
-    const zip = new JSZip();
-
-    for (const id of selectedEngagements) {
-      const engagement = items.find((e) => e.engagementId === id);
-      if (!engagement) continue;
-
-      // recording
-      if (engagement.publicUrl) {
-        try {
-          const response = await fetch(`${backendHost}${engagement.publicUrl}`);
-          const blob = await response.blob();
-          zip.file(`${engagement.engagementId}.mp3`, blob);
-        } catch (err) {
-          console.error(`Failed to download recording for ${id}`, err);
-        }
-      }
-
-      // transcript
-      if (engagement.transcript?.length) {
-        const textContent = engagement.transcript
-          .map((t) => `[${t.time}] ${t.speaker}: ${t.text}`)
-          .join("\n");
-        zip.file(`${engagement.engagementId}.txt`, textContent);
-      }
-    }
-
-    // generate & save zip
-    zip.generateAsync({ type: "blob" }).then((content) => {
-      saveAs(content, `engagements_${Date.now()}.zip`);
-    });
-  };
-
-  // ✅ existing single download handler
   const handleDownload = async (engagement, type) => {
+    // 🎵 Recording only
     if (type === "recording") {
       if (engagement.publicUrl) {
         try {
@@ -146,30 +93,40 @@ export default function EngagementTable({ items }) {
           console.error("Recording download failed:", err);
           alert("Failed to download recording!");
         }
+      } else {
+        alert("No recording available!");
       }
       return;
     }
-
+    // 📝 Transcript only
     if (type === "transcript") {
       if (engagement.transcript?.length) {
         const textContent = engagement.transcript
           .map((t) => `[${t.time}] ${t.speaker}: ${t.text}`)
           .join("\n");
         const blob = new Blob([textContent], { type: "text/plain" });
-        saveAs(blob, `${engagement.engagementId}.txt`);
+        triggerDownload(
+          URL.createObjectURL(blob),
+          `${engagement.engagementId}.txt`
+        );
+      } else {
+        alert("No transcript available!");
       }
       return;
     }
 
+    // 📦 Both → create ZIP
     if (type === "both") {
       const zip = new JSZip();
 
+      // Add recording if available
       if (engagement.publicUrl) {
         const response = await fetch(`${backendHost}${engagement.publicUrl}`);
         const blob = await response.blob();
         zip.file(`${engagement.engagementId}.mp3`, blob);
       }
 
+      // Add transcript if available
       if (engagement.transcript?.length) {
         const textContent = engagement.transcript
           .map((t) => `[${t.time}] ${t.speaker}: ${t.text}`)
@@ -177,13 +134,18 @@ export default function EngagementTable({ items }) {
         zip.file(`${engagement.engagementId}.txt`, textContent);
       }
 
+      // If nothing to zip
+      if (!engagement.publicUrl && !engagement.transcript?.length) {
+        alert("No recording or transcript available to download!");
+        return;
+      }
+
+      // Generate and download ZIP
       zip.generateAsync({ type: "blob" }).then((content) => {
         saveAs(content, `${engagement.engagementId}.zip`);
       });
     }
   };
-
-  // filters
   const filteredItems = items.filter((e) => {
     const matchesSearch =
       e.engagementId?.toLowerCase().includes(search.toLowerCase()) ||
@@ -312,39 +274,11 @@ export default function EngagementTable({ items }) {
         </div>
       </div>
 
-      {/* ✅ Bulk download bar */}
-      {/* <div className="bulk-download-bar">
-        <button
-          onClick={handleBulkDownload}
-          disabled={!selectedEngagements.length}
-        >
-          Download Selected ({selectedEngagements.length})
-        </button>
-      </div> */}
-
-      {selectedEngagements.length > 0 && (
-        <div className="bulk-download-bar">
-          <button onClick={handleBulkDownload}>Bulk Download</button>
-        </div>
-      )}
-
       {/* Table */}
       <div className="engagement-table-container">
         <table className="engagement-table">
           <thead>
             <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  checked={
-                    paginatedItems.length > 0 &&
-                    paginatedItems.every((e) =>
-                      selectedEngagements.includes(e.engagementId)
-                    )
-                  }
-                  onChange={toggleSelectAll}
-                />
-              </th>
               {visibleColumns.includes("Engagement ID") && (
                 <th>Engagement ID</th>
               )}
@@ -371,13 +305,6 @@ export default function EngagementTable({ items }) {
             {paginatedItems.length ? (
               paginatedItems.map((e) => (
                 <tr key={e.engagementId}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selectedEngagements.includes(e.engagementId)}
-                      onChange={() => toggleSelection(e.engagementId)}
-                    />
-                  </td>
                   {visibleColumns.includes("Engagement ID") && (
                     <td>
                       <span className="link">{e.engagementId}</span>
@@ -419,6 +346,52 @@ export default function EngagementTable({ items }) {
                       )}
                     </td>
                   )}
+                  {/* {visibleColumns.includes("Download") && (
+                    <td>
+                      <div className="dropdown">
+                        <button
+                          className="dropdown-toggle"
+                          onClick={() =>
+                            setOpenDropdown(
+                              openDropdown === e.engagementId
+                                ? null
+                                : e.engagementId
+                            )
+                          }
+                        >
+                          Download
+                        </button>
+                        {openDropdown === e.engagementId && (
+                          <div className="dropdown-menu">
+                            <button
+                              onClick={() => {
+                                handleDownload(e, "recording");
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Recording
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDownload(e, "transcript");
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Transcript
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDownload(e, "both");
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              Both (ZIP)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )} */}
 
                   {visibleColumns.includes("Download") && (
                     <td>
